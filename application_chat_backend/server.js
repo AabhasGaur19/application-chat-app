@@ -172,7 +172,9 @@ console.log('MONGO_URI defined:', !!process.env.MONGO_URI);
 console.log('FLUTTER_APP_URL:', process.env.FLUTTER_APP_URL);
 console.log('PORT:', process.env.PORT);
 
-const serviceAccount = require('./application-chat-flutter-firebase-adminsdk-fbsvc-81df3c9e8b.json');
+const serviceAccount = JSON.parse(
+  Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT, 'base64').toString('utf8')
+);
 
 const app = express();
 const server = http.createServer(app);
