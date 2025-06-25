@@ -16,27 +16,27 @@
 // router.handleSocket = (io, socket) => {
 //   const userId = socket.user.uid;
 
-// socket.on('join:chat', async ({ chatId }) => {
-//   socket.join(chatId);
-//   console.log(`${userId} joined chat ${chatId}`);
+//   socket.on("join:chat", async ({ chatId }) => {
+//     socket.join(chatId);
+//     console.log(`${userId} joined chat ${chatId}`);
 
-//   // Mark all unread messages in this chat as read for this user
-//   try {
-//     await Message.updateMany(
-//       {
-//         chatId,
-//         senderId: { $ne: userId },
-//         status: { $in: ['sent', 'delivered'] }
-//       },
-//       { status: 'read' }
-//     );
+//     // Mark all unread messages in this chat as read for this user
+//     try {
+//       await Message.updateMany(
+//         {
+//           chatId,
+//           senderId: { $ne: userId },
+//           status: { $in: ["sent", "delivered"] },
+//         },
+//         { status: "read" }
+//       );
 
-//     // Emit updated unread count (should be 0 now)
-//     io.to(userId).emit('unread:count', { chatId, count: 0 });
-//   } catch (error) {
-//     console.error('Error marking messages as read:', error);
-//   }
-// });
+//       // Emit updated unread count (should be 0 now)
+//       io.to(userId).emit("unread:count", { chatId, count: 0 });
+//     } catch (error) {
+//       console.error("Error marking messages as read:", error);
+//     }
+//   });
 
 //   // Typing indicator
 //   socket.on("typing", ({ chatId, isTyping }) => {
@@ -257,7 +257,14 @@
 //     };
 //     // Emit real-time message
 //     if (req.io) {
+//       // Emit to the chat room
 //       req.io.to(chatId).emit("message:new", messageData);
+
+//       // Also emit to each participant's personal room for better delivery
+//       for (const participantId of chat.participants) {
+//         req.io.to(participantId).emit("message:new", messageData);
+//       }
+
 //       // Update unread count for other participants
 //       const otherParticipants = chat.participants.filter(
 //         (uid) => uid !== req.user.uid
@@ -434,6 +441,11 @@ router.handleSocket = (io, socket) => {
       console.error("Error updating last seen:", error);
     }
   });
+    // Handle user room joining for notifications
+  socket.on('join:user', ({ userId }) => {
+    socket.join(userId);
+    console.log(`User ${userId} joined their notification room`);
+  });
 };
 
 router.post("/", verifyToken, async (req, res) => {
@@ -481,7 +493,25 @@ router.post("/", verifyToken, async (req, res) => {
     }
     chat = new Chat({ participants, updatedAt: getISTDate() });
     await chat.save();
-    res.status(201).json({
+    // res.status(201).json({
+    //   _id: chat._id,
+    //   participants: [
+    //     {
+    //       uid: req.user.uid,
+    //       displayName: req.user.name,
+    //       photoUrl: req.user.picture,
+    //     },
+    //     {
+    //       uid: participant.uid,
+    //       displayName: participant.displayName,
+    //       photoUrl: participant.photoUrl,
+    //     },
+    //   ],
+    //   lastMessage: null,
+    //   updatedAt: chat.updatedAt,
+    //   unreadCount: 0,
+    // });
+    const chatData = {
       _id: chat._id,
       participants: [
         {
@@ -498,7 +528,15 @@ router.post("/", verifyToken, async (req, res) => {
       lastMessage: null,
       updatedAt: chat.updatedAt,
       unreadCount: 0,
-    });
+    };
+
+    // Emit new chat to both participants
+    if (req.io) {
+      req.io.to(req.user.uid).emit("chat:new", chatData);
+      req.io.to(participantId).emit("chat:new", chatData);
+    }
+
+    res.status(201).json(chatData);
   } catch (error) {
     console.error("Chat creation error:", error);
     res
@@ -583,15 +621,52 @@ router.post("/:chatId/messages", verifyToken, async (req, res) => {
       createdAt: message.createdAt,
     };
     // Emit real-time message
-    if (req.io) {
+    // if (req.io) {
+    //   // Emit to the chat room
+    //   req.io.to(chatId).emit("message:new", messageData);
+
+    //   // Also emit to each participant's personal room for better delivery
+    //   for (const participantId of chat.participants) {
+    //     req.io.to(participantId).emit("message:new", messageData);
+    //   }
+
+    //   // Update unread count for other participants
+    //   const otherParticipants = chat.participants.filter(
+    //     (uid) => uid !== req.user.uid
+    //   );
+    //   for (const uid of otherParticipants) {
+    //     const unreadCount = await Message.countDocuments({
+    //       chatId,
+    //       status: { $in: ["sent", "delivered"] },
+    //       senderId: { $ne: uid },
+    //     });
+    //     req.io.to(uid).emit("unread:count", { chatId, count: unreadCount });
+    //   }
+    // } else {
+    //   console.warn(
+    //     "Socket.io instance not available, message saved but not emitted"
+    //   );
+    // }
+        if (req.io) {
       // Emit to the chat room
       req.io.to(chatId).emit("message:new", messageData);
-
+      
       // Also emit to each participant's personal room for better delivery
       for (const participantId of chat.participants) {
         req.io.to(participantId).emit("message:new", messageData);
       }
-
+      
+      // NEW: Also broadcast chat list update to show latest message
+      const updatedChatData = {
+        chatId: chatId,
+        lastMessage: messageData,
+        updatedAt: chat.updatedAt
+      };
+      
+      for (const participantId of chat.participants) {
+        req.io.to(participantId).emit("chat:updated", updatedChatData);
+      }
+      
       // Update unread count for other participants
       const otherParticipants = chat.participants.filter(
         (uid) => uid !== req.user.uid
