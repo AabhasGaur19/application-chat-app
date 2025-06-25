@@ -1,3 +1,5 @@
+//application_chat/lib/main.dart
+
 import 'package:application_chat/services/auth_service.dart';
 import 'package:application_chat/utils/theme.dart';
 import 'package:firebase_core/firebase_core.dart';

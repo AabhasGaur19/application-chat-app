@@ -1,3 +1,4 @@
+// application_chat_backend/middleware/firebaseAuth.js
 const admin = require('firebase-admin');
 
 const verifyToken = async (req, res, next) => {

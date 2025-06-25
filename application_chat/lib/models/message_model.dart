@@ -1,3 +1,5 @@
+//application_chat/lib/models/message_model.dart
+
 import 'package:application_chat/models/user_model.dart';
 
 class MessageModel {

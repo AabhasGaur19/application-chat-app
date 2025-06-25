@@ -1,3 +1,5 @@
+//application_chat/lib/screens/search_screen.dart
+
 import 'package:application_chat/models/user_model.dart';
 import 'package:application_chat/services/api_service.dart';
 import 'package:flutter/material.dart';

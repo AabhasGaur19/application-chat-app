@@ -1,3 +1,5 @@
+//application_chat/lib/screens/profile_screen.dart
+
 import 'package:application_chat/services/api_service.dart';
 import 'package:application_chat/services/auth_service.dart';
 import 'package:flutter/material.dart';

@@ -1,3 +1,4 @@
+// application_chat_backend/models/message.js
 const mongoose = require('mongoose');
 
 const messageSchema = new mongoose.Schema({
