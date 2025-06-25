@@ -208,7 +208,8 @@ import 'package:application_chat/services/auth_service.dart';
 import 'package:http_parser/http_parser.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://192.168.19.149:3000/api';
+  // static const String baseUrl = 'http://192.168.19.149:3000/api';
+  static const String baseUrl = 'https://application-chat-app.onrender.com/api';
   final AuthService _authService = AuthService();
 
   Future<Map<String, String>> _getHeaders() async {
