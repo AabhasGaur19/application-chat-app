@@ -486,7 +486,8 @@ router.post("/", verifyToken, async (req, res) => {
     if (chat) {
       const populatedChat = await Chat.findById(chat._id).populate({
         path: "lastMessage",
-        select: "content createdAt",
+        select: "content createdAt senderId",
+        populate: { path: "senderId", select: "uid displayName photoUrl" },
       });
       return res.status(200).json({
         _id: populatedChat._id,
@@ -503,7 +504,16 @@ router.post("/", verifyToken, async (req, res) => {
             photoUrl: participant.photoUrl,
           },
         ],
-        lastMessage: populatedChat.lastMessage,
+        lastMessage: populatedChat.lastMessage ? {
+          _id: populatedChat.lastMessage._id,
+          content: populatedChat.lastMessage.content,
+          createdAt: populatedChat.lastMessage.createdAt,
+          senderId: {
+            uid: populatedChat.lastMessage.senderId.uid,
+            displayName: populatedChat.lastMessage.senderId.displayName,
+            photoUrl: populatedChat.lastMessage.senderId.photoUrl,
+          },
+        } : null,
         updatedAt: populatedChat.updatedAt,
         unreadCount: await Message.countDocuments({
           chatId: chat._id,
@@ -554,7 +564,8 @@ router.get("/", verifyToken, async (req, res) => {
     const chats = await Chat.find({ participants: req.user.uid })
       .populate({
         path: "lastMessage",
-        select: "content createdAt",
+        select: "content createdAt senderId",
+        populate: { path: "senderId", select: "uid displayName photoUrl" },
       })
       .sort({ updatedAt: -1 });
     const populatedChats = await Promise.all(
@@ -574,8 +585,20 @@ router.get("/", verifyToken, async (req, res) => {
           participants,
           groupName: chat.groupName,
           groupAdmin: chat.groupAdmin,
-          groupMembers: chat.groupMembers,
-          lastMessage: chat.lastMessage,
+          groupMembers: chat.groupMembers ? await User.find(
+            { uid: { $in: chat.groupMembers } },
+            "uid displayName photoUrl"
+          ) : [],
+          lastMessage: chat.lastMessage ? {
+            _id: chat.lastMessage._id,
+            content: chat.lastMessage.content,
+            createdAt: chat.lastMessage.createdAt,
+            senderId: {
+              uid: chat.lastMessage.senderId.uid,
+              displayName: chat.lastMessage.senderId.displayName,
+              photoUrl: chat.lastMessage.senderId.photoUrl,
+            },
+          } : null,
           updatedAt: chat.updatedAt,
           unreadCount,
         };
@@ -671,27 +694,20 @@ router.get("/:chatId/messages", verifyToken, async (req, res) => {
     }
     const messages = await Message.find({ chatId })
       .sort({ createdAt: 1 })
-      .limit(50);
-    const populatedMessages = await Promise.all(
-      messages.map(async (message) => {
-        const sender = await User.findOne(
-          { uid: message.senderId },
-          "uid displayName photoUrl"
-        );
-        return {
-          _id: message._id,
-          chatId: message.chatId,
-          senderId: {
-            uid: sender.uid,
-            displayName: sender.displayName,
-            photoUrl: sender.photoUrl,
-          },
-          content: message.content,
-          status: message.status,
-          createdAt: message.createdAt,
-        };
-      })
-    );
+      .limit(50)
+      .populate('senderId', 'uid displayName photoUrl');
+    const populatedMessages = messages.map((message) => ({
+      _id: message._id,
+      chatId: message.chatId,
+      senderId: {
+        uid: message.senderId.uid,
+        displayName: message.senderId.displayName,
+        photoUrl: message.senderId.photoUrl,
+      },
+      content: message.content,
+      status: message.status,
+      createdAt: message.createdAt,
+    }));
     res.status(200).json(populatedMessages);
   } catch (error) {
     console.error("Error fetching messages:", error);

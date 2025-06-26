@@ -3,6 +3,7 @@ const router = express.Router();
 const verifyToken = require("../middleware/firebaseAuth");
 const Chat = require("../models/chat");
 const User = require("../models/user");
+const Message = require("../models/message"); // Add missing import
 
 // Helper function to get IST timestamp
 const getISTDate = () => {
@@ -38,8 +39,8 @@ router.handleSocket = (io, socket) => {
     }
   });
 
-  socket.on("typing:group", ({ groupId, isTyping }) => {
-    const chat = Chat.findById(groupId);
+  socket.on("typing:group", async ({ groupId, isTyping }) => {
+    const chat = await Chat.findById(groupId); // Ensure chat exists
     if (chat && chat.type === 'group') {
       socket.to(groupId).emit("typing:group", { userId, isTyping });
     }
@@ -121,7 +122,7 @@ router.put("/:groupId/members/add", verifyToken, async (req, res) => {
       groupAdmin: chat.groupAdmin,
       groupMembers: await User.find({ uid: { $in: chat.groupMembers } }, "uid displayName photoUrl"),
       participants: await User.find({ uid: { $in: chat.participants } }, "uid displayName photoUrl"),
-      lastMessage: chat.lastMessage,
+      lastMessage: chat.lastMessage ? await Message.findById(chat.lastMessage).populate('senderId', 'uid displayName photoUrl') : null,
       updatedAt: chat.updatedAt,
       unreadCount: 0,
     };
@@ -163,7 +164,7 @@ router.put("/:groupId/members/remove", verifyToken, async (req, res) => {
       groupAdmin: chat.groupAdmin,
       groupMembers: await User.find({ uid: { $in: chat.groupMembers } }, "uid displayName photoUrl"),
       participants: await User.find({ uid: { $in: chat.participants } }, "uid displayName photoUrl"),
-      lastMessage: chat.lastMessage,
+      lastMessage: chat.lastMessage ? await Message.findById(chat.lastMessage).populate('senderId', 'uid displayName photoUrl') : null,
       updatedAt: chat.updatedAt,
       unreadCount: 0,
     };
